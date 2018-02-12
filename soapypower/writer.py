@@ -61,8 +61,8 @@ class BaseWriter:
 
 class SoapyPowerBinFormat:
     """Power Spectral Density binary file format"""
-    header_struct = struct.Struct('<BdddddQQdd?i10s2x')
-    header = collections.namedtuple('Header', 'version time_start time_stop start stop step samples size lnb_lo tune_delay reset_stream fft_window_len fft_winodw')
+    header_struct = struct.Struct('<BdddddQQdd?12p2x')
+    header = collections.namedtuple('Header', 'version time_start time_stop start stop step samples size lnb_lo tune_delay reset_stream fft_winodw')
     magic = b'SDRFF'
     version = 2
 
@@ -79,16 +79,14 @@ class SoapyPowerBinFormat:
         )
         pwr_array = numpy.fromstring(f.read(header.size), dtype='float32')
 
-        header = list(header)
-        header[-1] = header[-1][:header[-2]]
-        return (tuple(header), pwr_array)
+        return (header, pwr_array)
 
     def write(self, f, time_start, time_stop, start, stop, step, samples, pwr_array, fft_window, lnb_lo, tune_delay, reset_stream):
         """Write data to file-like object"""
         f.write(self.magic)
         f.write(self.header_struct.pack(
             self.version, time_start, time_stop, start, stop, step, samples, pwr_array.nbytes,
-            lnb_lo, tune_delay, reset_stream, len(fft_window), fft_window
+            lnb_lo, tune_delay, reset_stream, fft_window
         ))
         #pwr_array.tofile(f)
         f.write(pwr_array.tobytes())
