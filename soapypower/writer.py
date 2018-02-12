@@ -61,8 +61,8 @@ class BaseWriter:
 
 class SoapyPowerBinFormat:
     """Power Spectral Density binary file format"""
-    header_struct = struct.Struct('<BdddddQQ2x')
-    header = collections.namedtuple('Header', 'version time_start time_stop start stop step samples size')
+    header_struct = struct.Struct('<BdddddQQdd?i10s2x')
+    header = collections.namedtuple('Header', 'version time_start time_stop start stop step samples size lnb_lo tune_delay reset_stream fft_window_len fft_winodw')
     magic = b'SDRFF'
     version = 2
 
@@ -78,13 +78,17 @@ class SoapyPowerBinFormat:
             self.header_struct.unpack(f.read(self.header_struct.size))
         )
         pwr_array = numpy.fromstring(f.read(header.size), dtype='float32')
-        return (header, pwr_array)
 
-    def write(self, f, time_start, time_stop, start, stop, step, samples, pwr_array):
+        header = list(header)
+        header[-1] = header[-1][:header[-2]]
+        return (tuple(header), pwr_array)
+
+    def write(self, f, time_start, time_stop, start, stop, step, samples, pwr_array, fft_window, lnb_lo, tune_delay, reset_stream):
         """Write data to file-like object"""
         f.write(self.magic)
         f.write(self.header_struct.pack(
-            self.version, time_start, time_stop, start, stop, step, samples, pwr_array.nbytes
+            self.version, time_start, time_stop, start, stop, step, samples, pwr_array.nbytes,
+            lnb_lo, tune_delay, reset_stream, len(fft_window), fft_window
         ))
         #pwr_array.tofile(f)
         f.write(pwr_array.tobytes())
@@ -101,7 +105,7 @@ class SoapyPowerBinWriter(BaseWriter):
         super().__init__(output=output)
         self.formatter = SoapyPowerBinFormat()
 
-    def write(self, psd_data_or_future, time_start, time_stop, samples):
+    def write(self, psd_data_or_future, time_start, time_stop, samples, fft_window, lnb_lo, tune_delay, reset_stream):
         """Write PSD of one frequency hop"""
         try:
             # Wait for result of future
@@ -119,7 +123,11 @@ class SoapyPowerBinWriter(BaseWriter):
                 f_array[-1] + step,
                 step,
                 samples,
-                pwr_array
+                pwr_array,
+                fft_window,
+                lnb_lo,
+                tune_delay,
+                reset_stream
             )
         except Exception as e:
             logging.exception('Error writing to output file: {}'.format(e))
@@ -135,7 +143,7 @@ class RtlPowerFftwWriter(BaseWriter):
         super().__init__(output=output)
         self.output = io.TextIOWrapper(self.output)
 
-    def write(self, psd_data_or_future, time_start, time_stop, samples):
+    def write(self, psd_data_or_future, time_start, time_stop, samples, **kw):
         """Write PSD of one frequency hop"""
         try:
             # Wait for result of future
@@ -167,7 +175,7 @@ class RtlPowerWriter(BaseWriter):
         super().__init__(output=output)
         self.output = io.TextIOWrapper(self.output)
 
-    def write(self, psd_data_or_future, time_start, time_stop, samples):
+    def write(self, psd_data_or_future, time_start, time_stop, samples, **kw):
         """Write PSD of one frequency hop"""
         try:
             # Wait for result of future

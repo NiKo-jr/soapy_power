@@ -297,7 +297,10 @@ class SoapyPower:
 
                     # Write PSD to stdout (in another thread)
                     self._writer.write_async(psd_future, acq_time_start, acq_time_stop,
-                                             len(self._buffer) * self._buffer_repeats)
+                                             len(self._buffer) * self._buffer_repeats,
+                                             fft_window=fft_window, lnb_lo=lnb_lo, tune_delay=tune_delay,
+                                             reset_stream=reset_stream
+                    )
 
                     if _shutdown:
                         break
